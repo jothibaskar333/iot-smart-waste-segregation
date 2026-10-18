@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local runtime data (SQLite database lives in instance/)
+instance/
+*.db
+*.sqlite3
+
+# Secrets / local environment files - never commit credentials
+.env
+.env.*
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store

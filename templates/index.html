@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Waste Segregation Monitor</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-title">
+    <h1>Smart Waste Segregation &amp; Monitoring</h1>
+    <p class="subtitle">IoT prototype dashboard &middot; rule-based sorting of wet, dry and metal waste</p>
+  </div>
+  <div class="topbar-status">
+    <span class="badge badge-sim" title="Sensor values, servo motion and bin levels are simulated in software. No physical hardware is connected.">
+      <span class="pulse" aria-hidden="true"></span> SIMULATION MODE
+    </span>
+    <span class="badge" id="mqtt-badge" title="MQTT connection state">MQTT: &hellip;</span>
+    <span class="updated" id="last-updated" aria-live="polite">Connecting&hellip;</span>
+  </div>
+</header>
+
+<div class="sim-banner" role="note">
+  <strong>Simulation notice:</strong> no physical sensors, servo or ultrasonic modules are connected.
+  Readings come from the simulator below, or from an MQTT publisher if you enable MQTT.
+</div>
+
+<main class="layout">
+  <!-- KPI tiles -->
+  <section class="kpis" aria-label="Summary">
+    <div class="kpi"><span class="kpi-label">Total items sorted</span><span class="kpi-value" id="kpi-total">0</span></div>
+    <div class="kpi kpi-wet"><span class="kpi-label"><i class="swatch swatch-wet"></i>Wet</span><span class="kpi-value" id="kpi-wet">0</span></div>
+    <div class="kpi kpi-dry"><span class="kpi-label"><i class="swatch swatch-dry"></i>Dry</span><span class="kpi-value" id="kpi-dry">0</span></div>
+    <div class="kpi kpi-metal"><span class="kpi-label"><i class="swatch swatch-metal"></i>Metal</span><span class="kpi-value" id="kpi-metal">0</span></div>
+    <div class="kpi"><span class="kpi-label">No-item detections</span><span class="kpi-value" id="kpi-none">0</span></div>
+    <div class="kpi"><span class="kpi-label">Active alerts</span><span class="kpi-value" id="kpi-alerts">0</span></div>
+  </section>
+
+  <!-- Simulation controls -->
+  <section class="card card-controls">
+    <h2>Simulate an item</h2>
+    <p class="hint">Each button generates a random <em>simulated</em> reading that fits the scenario and sends it through the classifier.</p>
+    <div class="btn-row">
+      <button class="btn btn-wet" data-sim="wet">Wet waste</button>
+      <button class="btn btn-dry" data-sim="dry">Dry waste</button>
+      <button class="btn btn-metal" data-sim="metal">Metal waste</button>
+      <button class="btn btn-ghost" data-sim="none">No item</button>
+    </div>
+
+    <details class="custom">
+      <summary>Custom sensor reading</summary>
+      <form id="custom-form" class="form-grid" novalidate>
+        <label class="check"><input type="checkbox" name="ir" checked> IR: item present</label>
+        <label class="check"><input type="checkbox" name="metal"> Metal detected</label>
+        <label>Moisture (%)
+          <input type="number" name="moisture" min="0" max="100" step="0.1" value="45" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Send reading</button>
+      </form>
+    </details>
+
+    <div class="result" id="last-result" aria-live="polite">
+      <span class="muted">No item processed yet.</span>
+    </div>
+  </section>
+
+  <!-- Current sensor readings -->
+  <section class="card card-sensors">
+    <h2>Latest sensor reading</h2>
+    <dl class="sensor-list">
+      <div><dt>IR (item present)</dt><dd id="s-ir">&ndash;</dd></div>
+      <div><dt>Metal sensor</dt><dd id="s-metal">&ndash;</dd></div>
+      <div class="span-2">
+        <dt>Moisture</dt>
+        <dd><span id="s-moisture">&ndash;</span>
+          <div class="meter" aria-hidden="true"><div class="meter-fill" id="s-moisture-bar"></div><div class="meter-mark" id="s-moisture-mark"></div></div>
+          <span class="tiny muted" id="s-moisture-note"></span>
+        </dd>
+      </div>
+      <div><dt>Classification</dt><dd id="s-class">&ndash;</dd></div>
+      <div><dt>Servo (simulated)</dt><dd id="s-servo">&ndash;</dd></div>
+      <div><dt>Source</dt><dd id="s-source">&ndash;</dd></div>
+      <div><dt>Received</dt><dd id="s-time">&ndash;</dd></div>
+    </dl>
+  </section>
+
+  <!-- Bin fill levels -->
+  <section class="card card-bins">
+    <div class="card-head">
+      <h2>Bin fill levels</h2>
+      <button class="btn btn-small btn-ghost" id="reset-all">Reset all bins</button>
+    </div>
+    <p class="hint">Simulated: each sorted item adds <span id="fill-inc">5</span>% to its bin. An MQTT payload may report measured levels instead.</p>
+    <div class="bins" id="bins">
+      {% for name in ['wet', 'dry', 'metal'] %}
+      <div class="bin" data-bin="{{ name }}">
+        <div class="bin-top">
+          <span class="bin-name"><i class="swatch swatch-{{ name }}"></i>{{ name|capitalize }}</span>
+          <span class="status" data-role="status">&ndash;</span>
+        </div>
+        <div class="bin-track" role="meter" aria-valuemin="0" aria-valuemax="100" aria-label="{{ name }} bin fill level">
+          <div class="bin-fill bin-fill-{{ name }}" data-role="fill"></div>
+          <div class="bin-threshold" data-role="threshold" title="High-fill threshold"></div>
+        </div>
+        <div class="bin-bottom">
+          <span class="bin-level" data-role="level">0%</span>
+          <button class="link-btn" data-reset="{{ name }}">reset</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- Thresholds -->
+  <section class="card card-settings">
+    <h2>Thresholds</h2>
+    <form id="settings-form" class="form-grid" novalidate>
+      <label>Moisture threshold (%)
+        <input type="number" name="moisture_threshold" min="0" max="100" step="0.5">
+        <span class="tiny muted">Moisture above this &rarr; WET</span>
+      </label>
+      <label>Low-fill threshold (%)
+        <input type="number" name="fill_low_threshold" min="0" max="100" step="1">
+        <span class="tiny muted">Below this &rarr; LOW</span>
+      </label>
+      <label>High-fill threshold (%)
+        <input type="number" name="fill_high_threshold" min="0" max="100" step="1">
+        <span class="tiny muted">At or above &rarr; HIGH + alert</span>
+      </label>
+      <label>Simulated fill per item (%)
+        <input type="number" name="fill_increment" min="0.5" max="100" step="0.5">
+        <span class="tiny muted">Simulation only</span>
+      </label>
+      <button type="submit" class="btn btn-primary">Save thresholds</button>
+    </form>
+  </section>
+
+  <!-- Charts -->
+  <section class="card card-chart">
+    <h2>Items sorted by category</h2>
+    <div class="chart-box chart-box-short"><canvas id="category-chart" aria-label="Bar chart of items sorted per category"></canvas></div>
+  </section>
+
+  <section class="card card-chart card-wide">
+    <h2>Fill levels over time</h2>
+    <div class="legend" aria-hidden="true">
+      <span><i class="swatch swatch-wet"></i>Wet</span>
+      <span><i class="swatch swatch-dry"></i>Dry</span>
+      <span><i class="swatch swatch-metal"></i>Metal</span>
+      <span><i class="swatch-line"></i>High threshold</span>
+    </div>
+    <div class="chart-box"><canvas id="fill-chart" aria-label="Line chart of bin fill levels over time"></canvas></div>
+    <p class="chart-fallback" id="chart-fallback" hidden>Charts could not be loaded (Chart.js missing).</p>
+  </section>
+
+  <!-- Alerts -->
+  <section class="card card-alerts">
+    <h2>Alerts</h2>
+    <h3 class="sub">Active</h3>
+    <ul class="alert-list" id="active-alerts"><li class="muted">No active alerts.</li></ul>
+    <h3 class="sub">History</h3>
+    <ul class="alert-list alert-history" id="alert-history"><li class="muted">No alerts yet.</li></ul>
+  </section>
+
+  <!-- MQTT -->
+  <section class="card card-mqtt">
+    <h2>MQTT input</h2>
+    <dl class="kv" id="mqtt-details">
+      <div><dt>State</dt><dd id="m-state">&ndash;</dd></div>
+      <div><dt>Broker</dt><dd id="m-broker">&ndash;</dd></div>
+      <div><dt>Topic</dt><dd id="m-topic">&ndash;</dd></div>
+      <div><dt>Messages</dt><dd id="m-count">&ndash;</dd></div>
+      <div><dt>Last message</dt><dd id="m-last">&ndash;</dd></div>
+      <div class="span-2"><dt>Last error</dt><dd id="m-error">&ndash;</dd></div>
+    </dl>
+    <p class="hint">MQTT is optional. Set <code>MQTT_ENABLED=true</code> and broker variables before starting the app (see README).</p>
+  </section>
+
+  <!-- Activity table -->
+  <section class="card card-table">
+    <h2>Recent sorting activity</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Time</th><th>Category</th><th>IR</th><th>Moisture</th><th>Metal</th><th>Servo action</th><th>Angle</th><th>Source</th></tr>
+        </thead>
+        <tbody id="events-body"><tr><td colspan="9" class="muted">No items sorted yet.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<footer class="footer">
+  Educational prototype &middot; rule-based logic, not a universal waste classifier &middot; servo and bin levels are simulated
+</footer>
+
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
