@@ -3,7 +3,16 @@
 A beginner-friendly IoT prototype that sorts waste into **wet**, **dry** and **metal** streams using three sensor inputs, drives a (simulated) servo diverter, monitors the fill level of three bins, and shows everything on a live web dashboard.
 
 > [!IMPORTANT]
-> **This project currently runs as a software simulation.** No physical sensors, servo motor or ultrasonic modules have been connected or tested. Sensor readings come from a built-in simulator or from any MQTT publisher. The code is organised so that an ESP32/ESP8266 can later send real readings over MQTT without changes to the backend.
+> **This repository (Version B) currently runs as a software simulation.** No physical sensors, servo motor or ultrasonic modules have been connected to this software or tested with it. Sensor readings come from a built-in simulator or from any MQTT publisher. The code is organised so that an ESP32/ESP8266 can later send real readings over MQTT without changes to the backend.
+
+### Project versions
+
+Our team first built a basic hardware version (Version A) that used image classification to sort items into paper, metal or organic. That build inspired this repository (Version B): a separate, software-based project that extends the idea with rule-based wet/dry/metal sorting, bin fill-level monitoring and a web dashboard. This repository contains only Version B.
+
+| Version | What it is | Status |
+|---------|------------|--------|
+| **A: Physical prototype** (team build) | Basic cardboard sorter: an Arduino Uno moves servo flaps based on an image classifier running on a laptop | Physically built and demonstrated. See [Physical prototype (Version A)](#physical-prototype-version-a) |
+| **B: This repository** | Software project inspired by Version A: Flask/SQLite/MQTT with rule-based wet/dry/metal sorting | Runs as a simulation. Not connected to hardware |
 
 ---
 
@@ -11,20 +20,21 @@ A beginner-friendly IoT prototype that sorts waste into **wet**, **dry** and **m
 
 1. [Problem statement and objectives](#problem-statement-and-objectives)
 2. [Simulation vs. physical hardware](#simulation-vs-physical-hardware)
-3. [Features](#features)
-4. [System architecture](#system-architecture)
-5. [Classification logic and limitations](#classification-logic-and-limitations)
-6. [Hardware plan (future ESP32/ESP8266 build)](#hardware-plan-future-esp32esp8266-build)
-7. [Software architecture](#software-architecture)
-8. [Database design](#database-design)
-9. [Setup on Windows (PowerShell)](#setup-on-windows-powershell)
-10. [Running the app and the tests](#running-the-app-and-the-tests)
-11. [MQTT integration](#mqtt-integration)
-12. [REST API](#rest-api)
-13. [Configuration reference](#configuration-reference)
-14. [Screenshots](#screenshots)
-15. [Limitations](#limitations)
-16. [Future improvements](#future-improvements)
+3. [Physical prototype (Version A)](#physical-prototype-version-a)
+4. [Features](#features)
+5. [System architecture](#system-architecture)
+6. [Classification logic and limitations](#classification-logic-and-limitations)
+7. [Hardware plan (future ESP32/ESP8266 build)](#hardware-plan-future-esp32esp8266-build)
+8. [Software architecture](#software-architecture)
+9. [Database design](#database-design)
+10. [Setup on Windows (PowerShell)](#setup-on-windows-powershell)
+11. [Running the app and the tests](#running-the-app-and-the-tests)
+12. [MQTT integration](#mqtt-integration)
+13. [REST API](#rest-api)
+14. [Configuration reference](#configuration-reference)
+15. [Screenshots](#screenshots)
+16. [Limitations](#limitations)
+17. [Future improvements](#future-improvements)
 
 ---
 
@@ -50,9 +60,51 @@ Mixed waste is hard to recycle or compost. Separating it at the point of disposa
 | Bin fill levels (ultrasonic) | **Simulated**: each sorted item adds a configurable percentage. An MQTT payload may report levels instead |
 | MQTT input | Implemented and optional. Tested during development against a **local** broker on the same PC with the included test publisher (`tools/publish_test_reading.py`), including broker disconnection and reconnection. Not tested with a real microcontroller or any cloud broker |
 | ESP32 firmware | A **reference sketch only** (`docs/firmware/`). Not compiled, flashed or tested |
-| Physical prototype | **Not built.** No hardware measurements exist |
+| Physical prototype | **Not connected.** This software version has not been connected to any hardware, and no hardware measurements from it exist. The team's separate physical prototype is described in [Physical prototype (Version A)](#physical-prototype-version-a) |
 
-The dashboard always shows a **SIMULATION MODE** badge, and the API reports `"physical_hardware_tested": false`.
+The dashboard always shows a **SIMULATION MODE** badge, and the API reports `"physical_hardware_tested": false`. Both refer to this software version only.
+
+## Physical prototype (Version A)
+
+> This section describes the team's separate hardware build. None of the code in this repository ran on it.
+
+![Cardboard sorter with output bins labelled O, M and P, an Arduino on a breadboard, servo-driven flaps, and a laptop running the classifier](docs/images/physical_prototype.jpg)
+
+Version A was a team project for **IoT & Embedded Systems (DIOT-05)**. It was a basic build that sorted items into paper, metal or organic using image classification. It was physically built and demonstrated, and it inspired the software-based project in this repository (Version B).
+
+### Components
+
+| Component | Purpose |
+|-----------|---------|
+| Arduino Uno on a breadboard | Reads the sensors and drives the servos |
+| Two servo-driven flaps | Direct each item to its bin |
+| IR sensor | Detects that an item is present |
+| Cylindrical inductive proximity sensor | Detects metal |
+| Laptop running a Python classifier (OpenCV + scikit-learn) | Classifies each item as paper, metal or organic |
+| Laptop's built-in camera | Captures the image the classifier uses |
+| Cardboard frame with three output bins | **O** (organic), **M** (metal), **P** (paper) |
+
+### How an item is sorted
+
+1. The IR sensor detects an item.
+2. The laptop's built-in camera captures an image, and the Python classifier classifies the item as paper, metal or organic.
+3. The laptop sends the result to the Arduino over USB serial (TODO: confirm the link and message format).
+4. The Arduino moves the matching servo flap.
+5. The item falls into the O, M or P bin.
+
+TODO: confirm how the laptop learns that the IR sensor has detected an item, what the inductive sensor's reading was used for (sorting decisions came from image classification), and which flap positions send an item to each of the three bins.
+
+### Team and roles
+
+| Member | Role |
+|--------|------|
+| Priyangshu Dutta | TODO: add role |
+| Akanshi Parihar | TODO: add role |
+| Jothi Baskar | Built the hardware and wrote the Arduino firmware |
+
+### Code
+
+Code for this version will be added.
 
 ## Features
 
@@ -461,7 +513,7 @@ Set these as environment variables before `python app.py` (PowerShell: `$env:NAM
 | Dashboard overview | *Placeholder: `docs/screenshots/dashboard-overview.png`* |
 | High-fill alert | *Placeholder: `docs/screenshots/fill-alert.png`* |
 | MQTT connected | *Placeholder: `docs/screenshots/mqtt-connected.png`* |
-| Physical prototype | *Placeholder: to be added only after real hardware is built* |
+| Physical prototype | Not applicable to this software version. A photo of the separate Version A build is in [Physical prototype (Version A)](#physical-prototype-version-a) |
 
 ## Limitations
 
