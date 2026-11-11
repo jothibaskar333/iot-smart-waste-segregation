@@ -70,37 +70,34 @@ The dashboard always shows a **SIMULATION MODE** badge, and the API reports `"ph
 
 ![Cardboard sorter with output bins labelled O, M and P, an Arduino on a breadboard, servo-driven flaps, and a laptop running the classifier](docs/images/physical_prototype.jpg)
 
-Version A was a team project for **IoT & Embedded Systems (DIOT-05)**. It was a basic build that sorted items into paper, metal or organic using image classification. It was physically built and demonstrated, and it inspired the software-based project in this repository (Version B).
+Version A was a team project for **IoT & Embedded Systems (DIOT-05)**. It was a basic build that sorted items into paper, metal or organic using image classification, with a metal sensor as a backup. It was physically built and demonstrated, and it inspired the software-based project in this repository (Version B).
 
 ### Components
 
 | Component | Purpose |
 |-----------|---------|
 | Arduino Uno on a breadboard | Reads the sensors and drives the servos |
-| Two servo-driven flaps | Direct each item to its bin |
-| IR sensor | Detects that an item is present |
-| Cylindrical inductive proximity sensor | Detects metal |
-| Laptop running a Python classifier (OpenCV + scikit-learn) | Classifies each item as paper, metal or organic |
+| Two servo-driven flaps | The first flap opens for paper, the second for metal. Anything else slides straight on to organic |
+| IR sensor | Detects that an item is present, before classification starts |
+| Cylindrical inductive proximity sensor | Backup metal check. If it detects metal, the item is sorted as metal whatever the image classifier decided |
+| Laptop running a Python classifier (OpenCV + scikit-learn) with a predefined model | Classifies each item as paper, metal or organic |
 | Laptop's built-in camera | Captures the image the classifier uses |
 | Cardboard frame with three output bins | **O** (organic), **M** (metal), **P** (paper) |
 
 ### How an item is sorted
 
-1. The IR sensor detects an item.
-2. The laptop's built-in camera captures an image, and the Python classifier classifies the item as paper, metal or organic.
-3. The laptop sends the result to the Arduino over USB serial (TODO: confirm the link and message format).
-4. The Arduino moves the matching servo flap.
-5. The item falls into the O, M or P bin.
+1. The IR sensor detects that an item is present.
+2. Once the item is sensed, the laptop's built-in camera captures an image, and the Python classifier uses a predefined model to classify the item as paper, metal or organic.
+3. The laptop sends the result to the Arduino over a physical cable.
+4. If the inductive sensor detects metal, the item is treated as metal, overriding the image result. For example, an item the classifier labelled paper is sorted as metal.
+5. The Arduino acts on the final decision:
+   - **Paper:** the first flap opens and the item drops into **P**.
+   - **Metal:** the second flap opens and the item drops into **M**.
+   - **Neither:** no flap opens and the item slides straight on to **O** (organic).
 
-TODO: confirm how the laptop learns that the IR sensor has detected an item, what the inductive sensor's reading was used for (sorting decisions came from image classification), and which flap positions send an item to each of the three bins.
+### Team
 
-### Team and roles
-
-| Member | Role |
-|--------|------|
-| Priyangshu Dutta | TODO: add role |
-| Akanshi Parihar | TODO: add role |
-| Jothi Baskar | Built the hardware and wrote the Arduino firmware |
+Priyangshu Dutta, Akanshi Parihar and Jothi Baskar. Jothi Baskar built the hardware and wrote the Arduino firmware.
 
 ### Code
 
